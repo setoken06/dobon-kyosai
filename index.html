@@ -41,6 +41,9 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--b
 .wrap { max-width: 560px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
 .eyebrow { font-size: 12px; letter-spacing: .12em; color: var(--muted); }
 h1 { font-family: var(--display); font-weight: 400; font-size: 26px; margin: 0; text-wrap: balance; }
+.tabs { display: flex; gap: 8px; }
+.tab { flex: 1; text-align: center; padding: 10px 12px; border-radius: 10px; background: var(--paper); border: 1px solid var(--line); color: var(--muted); font-weight: 700; font-family: var(--mono); font-size: 14px; cursor: pointer; }
+.tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 .total { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 14px; }
 .total .amount { font-family: var(--mono); font-weight: 700; font-size: clamp(36px, 11vw, 54px); line-height: 1; font-variant-numeric: tabular-nums; }
 .total .amount small { font-family: var(--body); font-size: 18px; margin-left: 4px; color: var(--muted); }
@@ -73,6 +76,8 @@ h1 { font-family: var(--display); font-weight: 400; font-size: 26px; margin: 0; 
     <h1>ドボン共済</h1>
   </header>
 
+  <div class="tabs" id="tabs" role="tablist"></div>
+
   <section class="total" aria-label="積立の合計">
     <div class="eyebrow">積立総額</div>
     <div class="amount"><span id="total">0</span><small>円</small></div>
@@ -91,65 +96,76 @@ h1 { font-family: var(--display); font-weight: 400; font-size: 26px; margin: 0; 
 </div>
 
 <script>
-// 記帳はここに1行ずつ足していく（新しい順でも古い順でもOK。表示は日付の新しい順）
-// who は "ken" か "aratyan"、amount は円
-const ENTRIES = [
-  // { date: "2026-11-06", who: "ken", amount: 1000 },
-  // 2026-11-06 dobon_online 対戦履歴（7戦）。矢印の先（受け取った側）が「入れた」人。古い順
-  { date: "2026-11-06", who: "ken", amount: 2800 },
-  { date: "2026-11-06", who: "aratyan", amount: 3200 },
-  { date: "2026-11-06", who: "ken", amount: 4800 },
-  { date: "2026-11-06", who: "ken", amount: 8800 },
-  { date: "2026-11-06", who: "ken", amount: 4000 },
-  { date: "2026-11-06", who: "aratyan", amount: 1600 },
-  { date: "2026-11-06", who: "aratyan", amount: 8000 },
-  { date: "2026-11-06", who: "aratyan", amount: 8000 },
-  { date: "2026-11-06", who: "aratyan", amount: 8800 },
-  { date: "2026-11-08", who: "aratyan", amount: 2000 },
-  { date: "2026-11-08", who: "ken", amount: 8000 },
-  { date: "2026-11-09", who: "ken", amount: 10000 },
-  { date: "2026-11-09", who: "aratyan", amount: 4000 },
-  { date: "2026-11-09", who: "aratyan", amount: 6000 },
-  { date: "2026-11-13", who: "ken", amount: 6400 },
-  { date: "2026-11-13", who: "ken", amount: 3600 },
-  { date: "2026-11-13", who: "aratyan", amount: 8000 },
-  { date: "2026-11-13", who: "aratyan", amount: 2000 },
-  { date: "2026-11-14", who: "aratyan", amount: 2000 },
-  { date: "2026-11-14", who: "ken", amount: 8000 },
-  { date: "2026-11-15", who: "ken", amount: 10000 },
-  { date: "2026-11-15", who: "ken", amount: 1200 },
-  { date: "2026-11-15", who: "ken", amount: 7200 },
-  { date: "2026-11-15", who: "ken", amount: 1600 },
-  { date: "2026-11-18", who: "ken", amount: 7200 },
-  { date: "2026-11-18", who: "ken", amount: 1600 },
-  { date: "2026-11-18", who: "aratyan", amount: 8400 },
-  { date: "2026-11-18", who: "ken", amount: 2800 },
-  { date: "2026-11-18", who: "ken", amount: 20000 },
-  { date: "2026-11-19", who: "ken", amount: 40000 },
-  { date: "2026-11-23", who: "aratyan", amount: 4400 },
-  { date: "2026-11-23", who: "ken", amount: 3600 },
-  { date: "2026-11-23", who: "aratyan", amount: 3600 },
-  { date: "2026-11-23", who: "ken", amount: 3600 },
-  { date: "2026-11-23", who: "aratyan", amount: 2800 },
-  { date: "2026-11-23", who: "aratyan", amount: 2000 },
-  { date: "2026-11-23", who: "ken", amount: 4800 },
-  { date: "2026-11-23", who: "aratyan", amount: 15200 },
-  { date: "2026-11-23", who: "ken", amount: 4400 },
-  { date: "2026-11-23", who: "ken", amount: 4800 },
-  { date: "2026-11-23", who: "aratyan", amount: 10800 },
-  { date: "2026-11-24", who: "aratyan", amount: 20000 },
-  { date: "2026-11-24", who: "aratyan", amount: 10000 },
-  { date: "2026-11-24", who: "aratyan", amount: 20000 },
-  { date: "2026-11-24", who: "aratyan", amount: 20000 },
-  { date: "2026-11-24", who: "ken", amount: 18400 },
-  { date: "2026-11-24", who: "aratyan", amount: 41600 },
+// シーズンごとに記帳をまとめる。who は "ken" か "aratyan"、amount は円。
+// 新しいシーズンを増やすときは SEASONS に { name, entries: [...] } を足す。デフォルトは最新シーズン。
+const SEASONS = [
+  {
+    name: "シーズン1",
+    entries: [
+      { date: "2026-11-06", who: "ken", amount: 2800 },
+      { date: "2026-11-06", who: "aratyan", amount: 3200 },
+      { date: "2026-11-06", who: "ken", amount: 4800 },
+      { date: "2026-11-06", who: "ken", amount: 8800 },
+      { date: "2026-11-06", who: "ken", amount: 4000 },
+      { date: "2026-11-06", who: "aratyan", amount: 1600 },
+      { date: "2026-11-06", who: "aratyan", amount: 8000 },
+      { date: "2026-11-06", who: "aratyan", amount: 8000 },
+      { date: "2026-11-06", who: "aratyan", amount: 8800 },
+      { date: "2026-11-08", who: "aratyan", amount: 2000 },
+      { date: "2026-11-08", who: "ken", amount: 8000 },
+      { date: "2026-11-09", who: "ken", amount: 10000 },
+      { date: "2026-11-09", who: "aratyan", amount: 4000 },
+      { date: "2026-11-09", who: "aratyan", amount: 6000 },
+      { date: "2026-11-13", who: "ken", amount: 6400 },
+      { date: "2026-11-13", who: "ken", amount: 3600 },
+      { date: "2026-11-13", who: "aratyan", amount: 8000 },
+      { date: "2026-11-13", who: "aratyan", amount: 2000 },
+      { date: "2026-11-14", who: "aratyan", amount: 2000 },
+      { date: "2026-11-14", who: "ken", amount: 8000 },
+      { date: "2026-11-15", who: "ken", amount: 10000 },
+      { date: "2026-11-15", who: "ken", amount: 1200 },
+      { date: "2026-11-15", who: "ken", amount: 7200 },
+      { date: "2026-11-15", who: "ken", amount: 1600 },
+      { date: "2026-11-18", who: "ken", amount: 7200 },
+      { date: "2026-11-18", who: "ken", amount: 1600 },
+      { date: "2026-11-18", who: "aratyan", amount: 8400 },
+      { date: "2026-11-18", who: "ken", amount: 2800 },
+      { date: "2026-11-18", who: "ken", amount: 20000 },
+      { date: "2026-11-19", who: "ken", amount: 40000 },
+      { date: "2026-11-23", who: "aratyan", amount: 4400 },
+      { date: "2026-11-23", who: "ken", amount: 3600 },
+      { date: "2026-11-23", who: "aratyan", amount: 3600 },
+      { date: "2026-11-23", who: "ken", amount: 3600 },
+      { date: "2026-11-23", who: "aratyan", amount: 2800 },
+      { date: "2026-11-23", who: "aratyan", amount: 2000 },
+      { date: "2026-11-23", who: "ken", amount: 4800 },
+      { date: "2026-11-23", who: "aratyan", amount: 15200 },
+      { date: "2026-11-23", who: "ken", amount: 4400 },
+      { date: "2026-11-23", who: "ken", amount: 4800 },
+      { date: "2026-11-23", who: "aratyan", amount: 10800 },
+      { date: "2026-11-24", who: "aratyan", amount: 20000 },
+      { date: "2026-11-24", who: "aratyan", amount: 10000 },
+      { date: "2026-11-24", who: "aratyan", amount: 20000 },
+      { date: "2026-11-24", who: "aratyan", amount: 20000 },
+      { date: "2026-11-24", who: "ken", amount: 18400 },
+      { date: "2026-11-24", who: "aratyan", amount: 41600 },
+      // 2026-11-25（昨日の結果・勝ち点ベースで集約）
+      { date: "2026-11-25", who: "ken", amount: 228000 },
+      { date: "2026-11-25", who: "aratyan", amount: 120800 },
+    ],
+  },
+  {
+    name: "シーズン2",
+    entries: [],
+  },
 ];
 
 const $ = (id) => document.getElementById(id);
 const yen = (n) => n.toLocaleString("ja-JP") + "円";
+let active = SEASONS.length - 1; // デフォルトは最新シーズン
 
-(function render() {
-  const rows = ENTRIES.map((r, i) => ({ ...r, i }));
+function render() {
+  const rows = SEASONS[active].entries.map((r, i) => ({ ...r, i }));
   const ken = rows.filter((r) => r.who === "ken");
   const ara = rows.filter((r) => r.who === "aratyan");
   const sk = ken.reduce((s, r) => s + r.amount, 0);
@@ -182,7 +198,27 @@ const yen = (n) => n.toLocaleString("ja-JP") + "円";
     row.append(d, c, y);
     list.appendChild(row);
   }
-})();
+}
+
+function buildTabs() {
+  const tabs = $("tabs");
+  tabs.textContent = "";
+  SEASONS.forEach((s, idx) => {
+    const b = document.createElement("button");
+    b.className = "tab" + (idx === active ? " active" : "");
+    b.textContent = s.name;
+    b.setAttribute("role", "tab");
+    b.addEventListener("click", () => {
+      active = idx;
+      buildTabs();
+      render();
+    });
+    tabs.appendChild(b);
+  });
+}
+
+buildTabs();
+render();
 </script>
 </body>
 </html>
