@@ -66,6 +66,10 @@ h1 { font-family: var(--display); font-weight: 400; font-size: 26px; margin: 0; 
 .chip.aratyan { background: var(--ara-soft); color: var(--ara); }
 .row .yen { font-family: var(--mono); font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
 .empty { padding: 22px 14px; color: var(--muted); font-size: 14px; line-height: 1.7; }
+.carousel { overflow: hidden; touch-action: pan-y; }
+.track { display: flex; align-items: flex-start; }
+.track.animate { transition: transform .3s cubic-bezier(.22,.61,.36,1); }
+.panel { flex: 0 0 100%; min-width: 0; display: flex; flex-direction: column; gap: 20px; }
 </style>
 </head>
 <body>
@@ -78,21 +82,9 @@ h1 { font-family: var(--display); font-weight: 400; font-size: 26px; margin: 0; 
 
   <div class="tabs" id="tabs" role="tablist"></div>
 
-  <section class="total" aria-label="積立の合計">
-    <div class="eyebrow">積立総額</div>
-    <div class="amount"><span id="total">0</span><small>円</small></div>
-    <div class="bar" aria-hidden="true"><span id="barKen" style="background:var(--ken);width:50%"></span><span id="barAra" style="background:var(--ara);width:50%"></span></div>
-    <div class="split">
-      <div class="who ken"><span class="name">ken</span><span class="sum" id="sumKen">0円</span><span class="cnt" id="cntKen">0回</span></div>
-      <div class="who aratyan"><span class="name">aratyan</span><span class="sum" id="sumAra">0円</span><span class="cnt" id="cntAra">0回</span></div>
-    </div>
-  </section>
-
-
-  <section class="ledger" aria-label="記帳の一覧">
-    <h2>記帳（新しい順）</h2>
-    <div id="list"></div>
-  </section>
+  <div class="carousel" id="carousel">
+    <div class="track" id="track"></div>
+  </div>
 </div>
 
 <script>
@@ -173,40 +165,61 @@ let active = (() => {
   return SEASONS.length - 1;
 })();
 
-function render() {
-  const rows = SEASONS[active].entries.map((r, i) => ({ ...r, i }));
+const carousel = $("carousel");
+const track = $("track");
+
+// シーズン1枚分のパネルを作る
+function buildPanel(season) {
+  const rows = season.entries.map((r, i) => ({ ...r, i }));
   const ken = rows.filter((r) => r.who === "ken");
   const ara = rows.filter((r) => r.who === "aratyan");
   const sk = ken.reduce((s, r) => s + r.amount, 0);
   const sa = ara.reduce((s, r) => s + r.amount, 0);
   const total = sk + sa;
-  $("total").textContent = total.toLocaleString("ja-JP");
-  $("sumKen").textContent = yen(sk);
-  $("sumAra").textContent = yen(sa);
-  $("cntKen").textContent = ken.length + "回";
-  $("cntAra").textContent = ara.length + "回";
   const pk = total ? (sk / total) * 100 : 50;
-  $("barKen").style.width = pk + "%";
-  $("barAra").style.width = 100 - pk + "%";
-  const list = $("list");
-  list.textContent = "";
+  const panel = document.createElement("div");
+  panel.className = "panel";
+  const totalSec = document.createElement("section");
+  totalSec.className = "total";
+  totalSec.setAttribute("aria-label", "積立の合計");
+  totalSec.innerHTML =
+    '<div class="eyebrow">積立総額</div>' +
+    '<div class="amount"><span>' + total.toLocaleString("ja-JP") + '</span><small>円</small></div>' +
+    '<div class="bar" aria-hidden="true"><span style="background:var(--ken);width:' + pk + '%"></span><span style="background:var(--ara);width:' + (100 - pk) + '%"></span></div>' +
+    '<div class="split">' +
+      '<div class="who ken"><span class="name">ken</span><span class="sum">' + yen(sk) + '</span><span class="cnt">' + ken.length + '回</span></div>' +
+      '<div class="who aratyan"><span class="name">aratyan</span><span class="sum">' + yen(sa) + '</span><span class="cnt">' + ara.length + '回</span></div>' +
+    '</div>';
+  const ledger = document.createElement("section");
+  ledger.className = "ledger";
+  ledger.setAttribute("aria-label", "記帳の一覧");
+  const h2 = document.createElement("h2"); h2.textContent = "記帳（新しい順）";
+  const list = document.createElement("div");
+  ledger.append(h2, list);
   if (!rows.length) {
-    const e = document.createElement("div");
-    e.className = "empty";
-    e.textContent = "まだ記帳がありません。";
-    list.appendChild(e);
-    return;
+    const e = document.createElement("div"); e.className = "empty"; e.textContent = "まだ記帳がありません。"; list.appendChild(e);
+  } else {
+    rows.sort((a, b) => b.date.localeCompare(a.date) || b.i - a.i);
+    for (const r of rows) {
+      const row = document.createElement("div"); row.className = "row";
+      const d = document.createElement("span"); d.className = "date"; d.textContent = r.date.replace(/-/g, "/");
+      const c = document.createElement("span"); c.className = "chip " + r.who; c.textContent = r.who;
+      const y = document.createElement("span"); y.className = "yen"; y.textContent = yen(r.amount);
+      row.append(d, c, y); list.appendChild(row);
+    }
   }
-  rows.sort((a, b) => b.date.localeCompare(a.date) || b.i - a.i);
-  for (const r of rows) {
-    const row = document.createElement("div");
-    row.className = "row";
-    const d = document.createElement("span"); d.className = "date"; d.textContent = r.date.replace(/-/g, "/");
-    const c = document.createElement("span"); c.className = "chip " + r.who; c.textContent = r.who;
-    const y = document.createElement("span"); y.className = "yen"; y.textContent = yen(r.amount);
-    row.append(d, c, y);
-    list.appendChild(row);
-  }
+  panel.append(totalSec, ledger);
+  return panel;
+}
+
+function buildTrack() {
+  track.textContent = "";
+  SEASONS.forEach((s) => track.appendChild(buildPanel(s)));
+}
+
+function layout(animate) {
+  track.classList.toggle("animate", !!animate);
+  track.style.transform = "translateX(" + (-active * carousel.clientWidth) + "px)";
 }
 
 function buildTabs() {
@@ -217,33 +230,51 @@ function buildTabs() {
     b.className = "tab" + (idx === active ? " active" : "");
     b.textContent = s.name;
     b.setAttribute("role", "tab");
-    b.addEventListener("click", () => {
-      active = idx;
-      buildTabs();
-      render();
-    });
+    b.addEventListener("click", () => go(idx));
     tabs.appendChild(b);
   });
 }
 
-// スワイプでシーズンを切り替える（左スワイプ=次／右スワイプ=前）
-(function () {
-  let sx = 0, sy = 0;
-  document.addEventListener("touchstart", (e) => {
-    const t = e.changedTouches[0]; sx = t.clientX; sy = t.clientY;
-  }, { passive: true });
-  document.addEventListener("touchend", (e) => {
-    const t = e.changedTouches[0];
-    const dx = t.clientX - sx, dy = t.clientY - sy;
-    // 横方向が十分大きいときだけ（縦スクロールと誤検知しない）
-    if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
-    if (dx < 0 && active < SEASONS.length - 1) { active++; buildTabs(); render(); }
-    else if (dx > 0 && active > 0) { active--; buildTabs(); render(); }
-  }, { passive: true });
-})();
+function go(idx, animate = true) {
+  active = Math.max(0, Math.min(SEASONS.length - 1, idx));
+  layout(animate);
+  buildTabs();
+}
 
+// 指でスライド → シーズンごとにスナップ
+let startX = 0, startY = 0, dx = 0, W = 0, dragging = false, decided = false, horiz = false;
+carousel.addEventListener("touchstart", (e) => {
+  const t = e.touches[0];
+  startX = t.clientX; startY = t.clientY; dx = 0; W = carousel.clientWidth;
+  dragging = true; decided = false; horiz = false;
+  track.classList.remove("animate");
+}, { passive: true });
+carousel.addEventListener("touchmove", (e) => {
+  if (!dragging) return;
+  const t = e.touches[0];
+  const mx = t.clientX - startX, my = t.clientY - startY;
+  if (!decided && (Math.abs(mx) > 8 || Math.abs(my) > 8)) { decided = true; horiz = Math.abs(mx) > Math.abs(my); }
+  if (!horiz) return;
+  dx = mx;
+  // 端でははみ出しに抵抗をかける
+  if ((active === 0 && dx > 0) || (active === SEASONS.length - 1 && dx < 0)) dx *= 0.35;
+  track.style.transform = "translateX(" + (-active * W + dx) + "px)";
+}, { passive: true });
+carousel.addEventListener("touchend", () => {
+  if (!dragging) return;
+  dragging = false;
+  const threshold = Math.min(70, W * 0.18);
+  if (horiz && dx < -threshold && active < SEASONS.length - 1) active++;
+  else if (horiz && dx > threshold && active > 0) active--;
+  layout(true);
+  buildTabs();
+}, { passive: true });
+
+window.addEventListener("resize", () => layout(false));
+
+buildTrack();
 buildTabs();
-render();
+layout(false);
 </script>
 </body>
 </html>
