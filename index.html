@@ -158,6 +158,10 @@ const SEASONS = [
     name: "シーズン2",
     entries: [],
   },
+  {
+    name: "シーズンB",
+    entries: [],
+  },
 ];
 
 const $ = (id) => document.getElementById(id);
@@ -216,6 +220,22 @@ function buildTabs() {
     tabs.appendChild(b);
   });
 }
+
+// スワイプでシーズンを切り替える（左スワイプ=次／右スワイプ=前）
+(function () {
+  let sx = 0, sy = 0;
+  document.addEventListener("touchstart", (e) => {
+    const t = e.changedTouches[0]; sx = t.clientX; sy = t.clientY;
+  }, { passive: true });
+  document.addEventListener("touchend", (e) => {
+    const t = e.changedTouches[0];
+    const dx = t.clientX - sx, dy = t.clientY - sy;
+    // 横方向が十分大きいときだけ（縦スクロールと誤検知しない）
+    if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    if (dx < 0 && active < SEASONS.length - 1) { active++; buildTabs(); render(); }
+    else if (dx > 0 && active > 0) { active--; buildTabs(); render(); }
+  }, { passive: true });
+})();
 
 buildTabs();
 render();
