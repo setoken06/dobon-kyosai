@@ -160,13 +160,18 @@ const SEASONS = [
   },
   {
     name: "シーズンB",
+    special: true, // 特殊系。タブ/スワイプでは出すが、初期表示のデフォルトにはしない
     entries: [],
   },
 ];
 
 const $ = (id) => document.getElementById(id);
 const yen = (n) => n.toLocaleString("ja-JP") + "円";
-let active = SEASONS.length - 1; // デフォルトは最新シーズン
+// デフォルトは最新の「通常」シーズン（special=特殊系は初期表示にしない）
+let active = (() => {
+  for (let i = SEASONS.length - 1; i >= 0; i--) if (!SEASONS[i].special) return i;
+  return SEASONS.length - 1;
+})();
 
 function render() {
   const rows = SEASONS[active].entries.map((r, i) => ({ ...r, i }));
